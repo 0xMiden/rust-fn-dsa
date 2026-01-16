@@ -79,7 +79,7 @@ mod backend;
 #[path = "flr_emu.rs"]
 mod backend;
 
-pub(crate) use backend::FLR;
+pub use backend::FLR;
 
 impl Default for FLR {
     fn default() -> Self {

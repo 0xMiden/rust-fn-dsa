@@ -59,9 +59,9 @@
 //! sk.sign(&mut OsRng, &DOMAIN_NONE, &HASH_ID_RAW, b"message", &mut sig);
 //! ```
 
-mod flr;
-mod poly;
-mod sampler;
+pub mod flr;
+pub mod poly;
+pub mod sampler;
 
 use fn_dsa_comm::{codec, hash_to_point, mq, shake, PRNG};
 use zeroize::{Zeroize, ZeroizeOnDrop};

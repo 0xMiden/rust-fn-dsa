@@ -21,7 +21,7 @@ use core::arch::x86::*;
 // and the (logarithmic) degree for the overall scheme (some constants
 // depend on the used degree).
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Sampler<T: PRNG> {
+pub struct Sampler<T: PRNG> {
     rng: T,
     logn: u32,
 }
@@ -103,7 +103,7 @@ const INV_LOG2: FLR = FLR::scaled(6497320848556798, -52);
 
 impl<T: PRNG> Sampler<T> {
 
-    pub(crate) fn new(logn: u32, seed: &[u8]) -> Self {
+    pub fn new(logn: u32, seed: &[u8]) -> Self {
         let rng = T::new(seed);
         Self { rng, logn }
     }
@@ -111,7 +111,7 @@ impl<T: PRNG> Sampler<T> {
     // SSE2 variant of next() (for 32-bit x86).
     #[cfg(all(target_arch = "x86", target_feature = "sse2"))]
     #[allow(dead_code)]
-    pub(crate) fn next(&mut self, mu: FLR, isigma: FLR) -> i32 {
+    pub fn next(&mut self, mu: FLR, isigma: FLR) -> i32 {
         unsafe {
             let fmu: f64 = core::mem::transmute(mu);
             let fisigma: f64 = core::mem::transmute(isigma);
@@ -123,7 +123,7 @@ impl<T: PRNG> Sampler<T> {
     // distribution with centre mu and inverse of the standard
     // deviation isigma.
     #[cfg(not(all(target_arch = "x86", target_feature = "sse2")))]
-    pub(crate) fn next(&mut self, mu: FLR, isigma: FLR) -> i32 {
+    pub fn next(&mut self, mu: FLR, isigma: FLR) -> i32 {
 
         // Centre is mu. We split it into s + r, for an integer
         // s, and 0 <= r < 1.
@@ -406,7 +406,7 @@ impl<T: PRNG> Sampler<T> {
     // The sampled vector is written over (t0,t1) and the Gram matrix
     // is also modified. The temporary buffer (tmp) must have room for
     // four extra polynomials. All polynomials are in FFT representation.
-    pub(crate) fn ffsamp_fft(&mut self,
+    pub fn ffsamp_fft(&mut self,
         t0: &mut [FLR], t1: &mut [FLR],
         g00: &mut [FLR], g01: &mut [FLR], g11: &mut [FLR], tmp: &mut [FLR])
     {

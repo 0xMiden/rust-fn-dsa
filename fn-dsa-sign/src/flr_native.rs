@@ -12,20 +12,20 @@
 // hardware can be assumed to operate in a sufficiently constant-time way.
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FLR(f64);
+pub struct FLR(f64);
 
 impl FLR {
 
-    pub(crate) const ZERO: Self = Self(0.0);
-    pub(crate) const NZERO: Self = Self(-0.0);
-    pub(crate) const ONE: Self = Self(1.0);
+    pub const ZERO: Self = Self(0.0);
+    pub const NZERO: Self = Self(-0.0);
+    pub const ONE: Self = Self(1.0);
 
     // Hardcoded powers of 2 for 2^(+127) to 2^(-128). This is used to
     // implement some operations where the exponent is not secret.
     // Values here were computed with 140 bits of precision, which is
     // overkill (such powers of 2 are exact in IEEE-754 'binary64'
     // format).
-    pub(crate) const INV_POW2: [f64; 256] = [
+    pub const INV_POW2: [f64; 256] = [
         1.7014118346046923173168730371588410572800e38,
         8.5070591730234615865843651857942052864000e37,
         4.2535295865117307932921825928971026432000e37,
@@ -285,12 +285,12 @@ impl FLR {
     ];
 
     #[inline(always)]
-    pub(crate) const fn from_i64(j: i64) -> Self {
+    pub const fn from_i64(j: i64) -> Self {
         Self(j as f64)
     }
 
     #[inline(always)]
-    pub(crate) const fn from_i32(j: i32) -> Self {
+    pub const fn from_i32(j: i32) -> Self {
         Self(j as f64)
     }
 
@@ -298,12 +298,12 @@ impl FLR {
     // value directly.
     #[allow(dead_code)]
     #[inline(always)]
-    pub(crate) const fn to_f64(self) -> f64 {
+    pub const fn to_f64(self) -> f64 {
         self.0
     }
 
     #[inline(always)]
-    pub(crate) const fn scaled(j: i64, sc: i32) -> Self {
+    pub const fn scaled(j: i64, sc: i32) -> Self {
         // Since from_i32() and from_i64() use direct integer-to-float
         // conversions, this function will be called only for evaluating
         // compile-time constants. However, there are limitations to what
@@ -320,7 +320,7 @@ impl FLR {
     // This is meant for tests only; this function does not need to be
     // constant-time.
     #[allow(dead_code)]
-    pub(crate) fn encode(self) -> [u8; 8] {
+    pub fn encode(self) -> [u8; 8] {
         self.0.to_le_bytes()
     }
 
@@ -328,7 +328,7 @@ impl FLR {
     // This is meant for tests only; this function does not need to be
     // constant-time.
     #[allow(dead_code)]
-    pub(crate) fn decode(src: &[u8]) -> Option<Self> {
+    pub fn decode(src: &[u8]) -> Option<Self> {
         match src.len() {
             8 => Some(Self(f64::from_le_bytes(
                 *<&[u8; 8]>::try_from(src).unwrap()))),
@@ -338,7 +338,7 @@ impl FLR {
 
     // Return self / 2.
     #[inline(always)]
-    pub(crate) fn half(self) -> Self {
+    pub fn half(self) -> Self {
         Self(self.0 * 0.5)
     }
 
@@ -346,13 +346,13 @@ impl FLR {
     // (used in some tests)
     #[allow(dead_code)]
     #[inline(always)]
-    pub(crate) fn double(self) -> Self {
+    pub fn double(self) -> Self {
         Self(self.0 * 2.0)
     }
 
     // Multiply this value by 2^63.
     #[inline(always)]
-    pub(crate) fn mul2p63(self) -> Self {
+    pub fn mul2p63(self) -> Self {
         Self(self.0 * 9223372036854775808.0)
     }
 
@@ -362,7 +362,7 @@ impl FLR {
     // and included in the FLR API because different implementations might
     // do it very differently.
     #[allow(dead_code)]
-    pub(crate) fn slice_div2e(f: &mut [FLR], e: u32) {
+    pub fn slice_div2e(f: &mut [FLR], e: u32) {
         let ee = Self::INV_POW2[(e + 127) as usize];
         for i in 0..f.len() {
             f[i] = Self(f[i].0 * ee);
@@ -370,7 +370,7 @@ impl FLR {
     }
 
     #[inline]
-    pub(crate) fn rint(self) -> i64 {
+    pub fn rint(self) -> i64 {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             use core::arch::x86_64::*;
@@ -434,7 +434,7 @@ impl FLR {
     }
 
     #[inline(always)]
-    pub(crate) fn floor(self) -> i64 {
+    pub fn floor(self) -> i64 {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             use core::arch::x86_64::*;
@@ -479,39 +479,39 @@ impl FLR {
     }
 
     #[inline(always)]
-    pub(crate) fn trunc(self) -> i64 {
+    pub fn trunc(self) -> i64 {
         self.0 as i64
     }
 
     #[inline(always)]
-    pub(crate) fn set_add(&mut self, other: Self) {
+    pub fn set_add(&mut self, other: Self) {
         self.0 += other.0;
     }
 
     #[inline(always)]
-    pub(crate) fn set_sub(&mut self, other: Self) {
+    pub fn set_sub(&mut self, other: Self) {
         self.0 -= other.0;
     }
 
     // Negation.
     #[inline(always)]
-    pub(crate) fn set_neg(&mut self) {
+    pub fn set_neg(&mut self) {
         self.0 = -self.0;
     }
 
     #[inline(always)]
-    pub(crate) fn set_mul(&mut self, other: Self) {
+    pub fn set_mul(&mut self, other: Self) {
         self.0 *= other.0;
     }
 
     #[inline(always)]
-    pub(crate) fn square(self) -> Self {
+    pub fn square(self) -> Self {
         Self(self.0 * self.0)
     }
 
     #[cfg(feature = "div_emu")]
     #[inline]
-    pub(crate) fn set_div(&mut self, other: Self) {
+    pub fn set_div(&mut self, other: Self) {
         let x = u64::from_le_bytes(self.0.to_le_bytes());
         let y = u64::from_le_bytes(other.0.to_le_bytes());
         let z = Self::div_emu(x, y);
@@ -520,12 +520,12 @@ impl FLR {
 
     #[cfg(not(feature = "div_emu"))]
     #[inline(always)]
-    pub(crate) fn set_div(&mut self, other: Self) {
+    pub fn set_div(&mut self, other: Self) {
         self.0 /= other.0;
     }
 
     #[allow(dead_code)]
-    pub(crate) fn abs(self) -> Self {
+    pub fn abs(self) -> Self {
         // This is for tests, thus it does not need to be constant-time.
         // (it could be made constant-time with intrinsics)
         if self.0 < 0.0 {
@@ -535,7 +535,7 @@ impl FLR {
         }
     }
 
-    pub(crate) fn sqrt(self) -> Self {
+    pub fn sqrt(self) -> Self {
         #[cfg(not(feature = "sqrt_emu"))]
         {
             // f64::sqrt() is in std but not in core. We use the
@@ -669,7 +669,7 @@ impl FLR {
         ((e as u64) << 52) + (q >> 2) + cc
     }
 
-    pub(crate) fn expm_p63(self, ccs: Self) -> u64 {
+    pub fn expm_p63(self, ccs: Self) -> u64 {
         // For full reproducibility of test vectors, we should take care
         // to always return the same values as the emulated code.
 

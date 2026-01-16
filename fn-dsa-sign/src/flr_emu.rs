@@ -15,7 +15,7 @@
 // operations and strives to be constant-time.
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FLR(u64);
+pub struct FLR(u64);
 
 // lzcnt_nz(x) returns the number of leading zeros in the value x, assuming
 // that it is non-zero.
@@ -222,15 +222,15 @@ impl FLR {
         Self((s << 63) + ((e as u64) << 52) + (m >> 2) + cc)
     }
 
-    pub(crate) const ZERO: Self = Self(0);
-    pub(crate) const NZERO: Self = Self(1u64 << 63);
-    pub(crate) const ONE: Self = Self::from_i64(1);
+    pub const ZERO: Self = Self(0);
+    pub const NZERO: Self = Self(1u64 << 63);
+    pub const ONE: Self = Self::from_i64(1);
 
     // Convert a signed 64-bit integer to an FLR value.
     // Source value j must be in [-(2^63-1),+(2^63-1)] (i.e. -2^63 is
     // not allowed).
     #[inline(always)]
-    pub(crate) const fn from_i64(j: i64) -> Self {
+    pub const fn from_i64(j: i64) -> Self {
         Self::scaled(j, 0)
     }
 
@@ -238,7 +238,7 @@ impl FLR {
     // The complete 32-bit range is allowed, and the conversion is always
     // exact (the original integer can be recovered exactly).
     #[inline(always)]
-    pub(crate) const fn from_i32(j: i32) -> Self {
+    pub const fn from_i32(j: i32) -> Self {
         Self::scaled(j as i64, 0)
     }
 
@@ -250,7 +250,7 @@ impl FLR {
     // also used for conversion from integers (from_i32(), from_i64()),
     // since these functions are used with runtime secret values.
     #[inline(always)]
-    pub(crate) const fn scaled(j: i64, sc: i32) -> Self {
+    pub const fn scaled(j: i64, sc: i32) -> Self {
         // Extract sign bit and get absolute value.
         let s = (j >> 63) as u64;
         let j = ((j as u64) ^ s).wrapping_sub(s);
@@ -273,7 +273,7 @@ impl FLR {
     // This is meant for tests only; this function does not need to be
     // constant-time.
     #[allow(dead_code)]
-    pub(crate) fn encode(self) -> [u8; 8] {
+    pub fn encode(self) -> [u8; 8] {
         self.0.to_le_bytes()
     }
 
@@ -281,7 +281,7 @@ impl FLR {
     // This is meant for tests only; this function does not need to be
     // constant-time.
     #[allow(dead_code)]
-    pub(crate) fn decode(src: &[u8]) -> Option<Self> {
+    pub fn decode(src: &[u8]) -> Option<Self> {
         match src.len() {
             8 => Some(Self(u64::from_le_bytes(
                 *<&[u8; 8]>::try_from(src).unwrap()))),
@@ -291,7 +291,7 @@ impl FLR {
 
     // Return self / 2.
     #[inline]
-    pub(crate) fn half(self) -> Self {
+    pub fn half(self) -> Self {
         // We subtract 1 from the exponent, unless it is already the
         // minimal exponent, i.e. the value is 0. In that case, the
         // subtraction borrow spills into the sign bit, hence we can
@@ -305,7 +305,7 @@ impl FLR {
     // (used in some tests)
     #[allow(dead_code)]
     #[inline]
-    pub(crate) fn double(self) -> Self {
+    pub fn double(self) -> Self {
         // We add 1 to the exponent, unless it was the minimal value,
         // since such a value is for zero, and doubling zero does not
         // change it.
@@ -316,7 +316,7 @@ impl FLR {
 
     // Multiply this value by 2^63.
     #[inline]
-    pub(crate) fn mul2p63(self) -> Self {
+    pub fn mul2p63(self) -> Self {
         // As in double(), we add 63 to the exponent, unless the value
         // was zero.
         let x = self.0;
@@ -331,7 +331,7 @@ impl FLR {
     // and included in the FLR API because different implementations might
     // do it very differently.
     #[allow(dead_code)]
-    pub(crate) fn slice_div2e(f: &mut [FLR], e: u32) {
+    pub fn slice_div2e(f: &mut [FLR], e: u32) {
         // In the emulated implementation, division by 2^e is done by
         // subtracting e from the exponent; we must just take care not to
         // do that with zero. If the exponent subtraction overflows, then
@@ -348,7 +348,7 @@ impl FLR {
     // Round this value to the nearest integer; the source must be in the
     // [-(2^63-1), +(2^63-1)] range.
     #[inline]
-    pub(crate) fn rint(self) -> i64 {
+    pub fn rint(self) -> i64 {
         // Shifted mantissa to be in the [2^62,2^63-1] range (with the top
         // bit set).
         let m = ((self.0 << 10) | (1u64 << 62)) & M63;
@@ -388,7 +388,7 @@ impl FLR {
     // (i.e. round toward -infinity). The source must be in the
     // [-(2^63-1), +(2^63-1)] range.
     #[inline]
-    pub(crate) fn floor(self) -> i64 {
+    pub fn floor(self) -> i64 {
         // We extract the mantissa just as in rint(), but we apply the
         // sign bit to it. We can then do the right shift over the signed
         // value; the integer shift rules will apply the proper rounding.
@@ -414,7 +414,7 @@ impl FLR {
     // Round this value toward zero. The source must be in the
     // [-(2^63-1), +(2^63-1)] range.
     #[inline]
-    pub(crate) fn trunc(self) -> i64 {
+    pub fn trunc(self) -> i64 {
         // We extract the mantissa just as in rint(). We do the shift
         // with the unsigned mantissa, dropping the low bits; the sign
         // is applied afterwards. As in floor(), we can handle large
@@ -431,7 +431,7 @@ impl FLR {
 
     // Addition.
     #[inline]
-    pub(crate) fn set_add(&mut self, other: Self) {
+    pub fn set_add(&mut self, other: Self) {
         // Get both operands as x and y, and such that x has the greater
         // absolute value of the two. If x and y have the same absolute
         // value and different signs, when we want x to be the positive
@@ -513,19 +513,19 @@ impl FLR {
 
     // Subtraction.
     #[inline(always)]
-    pub(crate) fn set_sub(&mut self, other: Self) {
+    pub fn set_sub(&mut self, other: Self) {
         self.set_add(Self(other.0 ^ (1u64 << 63)));
     }
 
     // Negation.
     #[inline(always)]
-    pub(crate) fn set_neg(&mut self) {
+    pub fn set_neg(&mut self) {
         self.0 ^= 1u64 << 63;
     }
 
     // Multiplication.
     #[inline]
-    pub(crate) fn set_mul(&mut self, other: Self) {
+    pub fn set_mul(&mut self, other: Self) {
         // Extract absolute values of mantissas, assuming non-zero
         // operands, and multiply them together.
         let xu = (self.0 & M52) | (1u64 << 52);
@@ -593,12 +593,12 @@ impl FLR {
 
     // Squaring.
     #[inline(always)]
-    pub(crate) fn square(self) -> Self {
+    pub fn square(self) -> Self {
         self * self
     }
 
     // Division.
-    pub(crate) fn set_div(&mut self, other: Self) {
+    pub fn set_div(&mut self, other: Self) {
         // Extract mantissas (unsigned).
         let mut xu = (self.0 & M52) | (1u64 << 52);
         let yu = (other.0 & M52) | (1u64 << 52);
@@ -656,12 +656,12 @@ impl FLR {
     // Absolute value (used for tests, does not need to be constant-time).
     #[allow(dead_code)]
     #[inline(always)]
-    pub(crate) fn abs(self) -> Self {
+    pub fn abs(self) -> Self {
         Self(self.0 & M63)
     }
 
     // Square root.
-    pub(crate) fn sqrt(self) -> Self {
+    pub fn sqrt(self) -> Self {
         // Extract exponent and mantissa. By assumption, the operand is
         // non-negative, hence we can ignore that the sign bit (we must
         // still mask it out because sqrt() can be applied to -0.0).
@@ -718,7 +718,7 @@ impl FLR {
     // Compute 2^63*ccs*exp(-self), rounded to an integer. This function
     // assumes that 0 <= self < log(2) and 0 <= ccs <= 1; it returns a value
     // in [0,2^63] (low values are possible only if ccs is very small).
-    pub(crate) fn expm_p63(self, ccs: Self) -> u64 {
+    pub fn expm_p63(self, ccs: Self) -> u64 {
         // The polynomial approximation of exp(-x) is from FACCT:
         //   https://eprint.iacr.org/2018/1234
         // Specifically, the values are extracted from the implementation
@@ -756,7 +756,7 @@ impl FLR {
         y
     }
 
-    pub(crate) const EXPM_COEFFS: [u64; 13] = [
+    pub const EXPM_COEFFS: [u64; 13] = [
         0x00000004741183A3,
         0x00000036548CFC06,
         0x0000024FDCBF140A,
