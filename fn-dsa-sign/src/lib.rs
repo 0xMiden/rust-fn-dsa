@@ -59,9 +59,12 @@
 //! sk.sign(&mut OsRng, &DOMAIN_NONE, &HASH_ID_RAW, b"message", &mut sig);
 //! ```
 
+extern crate alloc;
+
 pub mod flr;
 pub mod poly;
 pub mod sampler;
+pub mod sign_core;
 
 use fn_dsa_comm::{codec, hash_to_point, mq, shake, PRNG};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -317,8 +320,14 @@ sign_key_impl!(SigningKeyWeak, 2, 8);
 #[cfg(all(not(feature = "no_avx2"), target_arch = "x86_64"))]
 mod sign_avx2;
 
-// Decode a private key.
-fn decode_inner(logn_min: u32, logn_max: u32,
+/// Decodes a private key and computes the derived values (G and verification key).
+///
+/// This function decodes f, g, F from the encoded secret key, then computes:
+/// - G from f, g, F using G = g*F/f mod q
+/// - The verification key h = g/f mod q
+///
+/// Returns `Some(logn)` on success, `None` on decode failure.
+pub fn decode_inner(logn_min: u32, logn_max: u32,
     f: &mut [i8], g: &mut [i8], F: &mut [i8], G: &mut [i8],
     vrfy_key: &mut [u8], hashed_vrfy_key: &mut [u8],
     tmp_u16: &mut [u16], src: &[u8]) -> Option<u32>
@@ -412,7 +421,10 @@ fn decode_inner(logn_min: u32, logn_max: u32,
     Some(logn)
 }
 
-fn compute_basis_inner(logn: u32,
+/// Computes the FFT basis B = [[g, -f], [G, -F]] from secret key polynomials.
+///
+/// The basis is stored as [b00, b01, b10, b11] where each is n FLR values in FFT domain.
+pub fn compute_basis_inner(logn: u32,
     f: &[i8], g: &[i8], F: &[i8], G: &[i8], basis: &mut [flr::FLR])
 {
     let n = 1usize << logn;
