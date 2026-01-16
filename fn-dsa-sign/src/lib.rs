@@ -702,8 +702,8 @@ fn sign_inner<T: CryptoRng + RngCore, P: PRNG>(logn: u32, rng: &mut T,
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "testing"))]
+pub mod tests {
 
     use super::*;
     use fn_dsa_comm::shake::SHAKE256;
@@ -807,7 +807,7 @@ pub(crate) mod tests {
     // C code to get reproducible behaviour. The seed MUST have length
     // 56 bytes exactly (this is how it is used in sign_inner()).
     #[derive(Clone, Copy, Debug)]
-    struct ChaCha20PRNG {
+    pub struct ChaCha20PRNG {
         buf: [u8; 512],
         state: [u8; 256],
         ptr: usize,
