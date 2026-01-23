@@ -111,6 +111,20 @@ pub trait VerifyingKey: Sized {
     /// also lead to `false` being returned.
     fn verify(&self, sig: &[u8],
         ctx: &DomainContext, id: &HashIdentifier, hv: &[u8]) -> bool;
+
+    /// Verify a signature with a pre-computed hash-to-point.
+    ///
+    /// This is a low-level method for custom signing flows that use a
+    /// different hash-to-point function.
+    ///
+    /// Parameters:
+    ///
+    ///  - `hm`: the hash-to-point result (polynomial coefficients in external
+    ///    representation, i.e., values in [0, q-1])
+    ///  - `s2`: the signature polynomial (decoded, signed coefficients)
+    ///
+    /// Return value is `true` if the signature is valid, `false` otherwise.
+    fn verify_prehash(&self, hm: &[u16], s2: &[i16]) -> bool;
 }
 
 macro_rules! vrfy_key_impl {
@@ -182,6 +196,28 @@ macro_rules! vrfy_key_impl {
             verify_inner(logn,
                 &self.h[..n], &self.hashed_key, sig, ctx, id, hv,
                 &mut tmp_i16[..n], &mut tmp_u16[..(2 * n)])
+        }
+
+        fn verify_prehash(&self, hm: &[u16], s2: &[i16]) -> bool
+        {
+            let logn = self.logn;
+            let n = 1usize << logn;
+            if hm.len() != n || s2.len() != n {
+                return false;
+            }
+            let mut tmp_u16 = [0u16; 2 << ($logn_max)];
+
+            #[cfg(all(not(feature = "no_avx2"),
+                any(target_arch = "x86_64", target_arch = "x86")))]
+            if self.use_avx2 {
+                unsafe {
+                    return verify_prehash_avx2_inner(logn,
+                        &self.h[..n], hm, s2, &mut tmp_u16[..(2 * n)]);
+                }
+            }
+
+            verify_prehash_inner(logn,
+                &self.h[..n], hm, s2, &mut tmp_u16[..(2 * n)])
         }
     }
 
@@ -282,6 +318,39 @@ fn verify_inner(logn: u32, h: &[u16], hashed_key: &[u8],
     norm1 < norm2.wrapping_neg() && (norm1 + norm2) <= mq::SQBETA[logn as usize]
 }
 
+// Verification with pre-computed hash-to-point.
+fn verify_prehash_inner(logn: u32, h: &[u16], hm: &[u16], s2: &[i16],
+    tmp_u16: &mut [u16]) -> bool
+{
+    let n = 1usize << logn;
+    let (t1, tmp_u16) = tmp_u16.split_at_mut(n);
+    let (t2, _) = tmp_u16.split_at_mut(n);
+
+    // norm2 <- squared norm of s2
+    let norm2 = mq::signed_poly_sqnorm(logn, s2);
+
+    // t1 <- hm (internal format)
+    t1.copy_from_slice(hm);
+    mq::mqpoly_ext_to_int(logn, t1);
+
+    // t2 <- s2 (NTT format)
+    mq::mqpoly_signed_to_ext(logn, s2, t2);
+    mq::mqpoly_ext_to_int(logn, t2);
+    mq::mqpoly_int_to_NTT(logn, t2);
+
+    // t1 <- s1 = c - s2*h (external format)
+    mq::mqpoly_mul_ntt(logn, t2, h);
+    mq::mqpoly_NTT_to_int(logn, t2);
+    mq::mqpoly_sub_int(logn, t1, t2);
+    mq::mqpoly_int_to_ext(logn, t1);
+
+    // norm1 <- squared norm of s1
+    let norm1 = mq::mqpoly_sqnorm(logn, &*t1);
+
+    // Signature is valid if the total squared norm of (s1,s2) is small enough.
+    norm1 < norm2.wrapping_neg() && (norm1 + norm2) <= mq::SQBETA[logn as usize]
+}
+
 // AVX2-optimized implementation of key decoding.
 #[cfg(all(not(feature = "no_avx2"),
     any(target_arch = "x86_64", target_arch = "x86")))]
@@ -366,6 +435,45 @@ unsafe fn verify_avx2_inner(logn: u32, h: &[u16], hashed_key: &[u8],
 
     // Signature is valid if the total squared norm of (s1,s2) is small
     // enough. We must take care of not overflowing.
+    norm1 < norm2.wrapping_neg()
+        && (norm1 + norm2) <= mq_avx2::SQBETA[logn as usize]
+}
+
+// AVX2-optimized implementation of verification with pre-computed hash-to-point.
+#[cfg(all(not(feature = "no_avx2"),
+    any(target_arch = "x86_64", target_arch = "x86")))]
+#[target_feature(enable = "avx2")]
+unsafe fn verify_prehash_avx2_inner(logn: u32, h: &[u16], hm: &[u16], s2: &[i16],
+    tmp_u16: &mut [u16]) -> bool
+{
+    use fn_dsa_comm::mq_avx2;
+
+    let n = 1usize << logn;
+    let (t1, tmp_u16) = tmp_u16.split_at_mut(n);
+    let (t2, _) = tmp_u16.split_at_mut(n);
+
+    // norm2 <- squared norm of s2
+    let norm2 = mq_avx2::signed_poly_sqnorm(logn, s2);
+
+    // t1 <- hm (internal format)
+    t1.copy_from_slice(hm);
+    mq_avx2::mqpoly_ext_to_int(logn, t1);
+
+    // t2 <- s2 (NTT format)
+    mq_avx2::mqpoly_signed_to_ext(logn, s2, t2);
+    mq_avx2::mqpoly_ext_to_int(logn, t2);
+    mq_avx2::mqpoly_int_to_NTT(logn, t2);
+
+    // t1 <- s1 = c - s2*h (external format)
+    mq_avx2::mqpoly_mul_ntt(logn, t2, h);
+    mq_avx2::mqpoly_NTT_to_int(logn, t2);
+    mq_avx2::mqpoly_sub_int(logn, t1, t2);
+    mq_avx2::mqpoly_int_to_ext(logn, t1);
+
+    // norm1 <- squared norm of s1
+    let norm1 = mq_avx2::mqpoly_sqnorm(logn, &*t1);
+
+    // Signature is valid if the total squared norm of (s1,s2) is small enough.
     norm1 < norm2.wrapping_neg()
         && (norm1 + norm2) <= mq_avx2::SQBETA[logn as usize]
 }
